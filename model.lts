@@ -1,0 +1,48 @@
+const NUM_PILOTS = 3
+const NUM_TUGS = 5
+const DOCKING_TUGS = 3
+const UNDOCKING_TUGS = 2
+
+const WAIT_ZONE_CAPACITY = 1
+range PILOTS = 1..NUM_PILOTS
+
+const FALSE = 0
+const TRUE = 1
+range BOOL = FALSE..TRUE
+
+PRODUCER = (arrive -> PRODUCER).
+CONSUMER = (depart -> CONSUMER).
+
+OPERATOR = (shield_activate -> shield_deactivate -> OPERATOR).
+
+PILOT = (acquire_ship -> 
+		acquire_dock_tugs -> 
+		depart_arrival_zone -> 
+		dock -> 
+		release_dock_tugs -> 
+		unload -> 
+		acquire_undock_tugs -> 
+		undock -> 
+		arrive_departure_zone -> 
+		release_undock_tugs -> 
+		release_ship -> PILOT).
+
+ARRIVAL_ZONE(N=WAIT_ZONE_CAPACITY) = COUNT[0],
+COUNT[i : 0..N] = 
+	( when (i < N) arrive -> COUNT[i+1]).
+
+DEPARTURE_ZONE(N=WAIT_ZONE_CAPACITY) = COUNT[0],
+COUNT[i : 0..N] = 
+	( when (i > 0) depart -> COUNT[i-1]).
+
+BERTH(N=1) = BERTH[0],
+BERTH[i:0..N] = ( when (i == 0) shield_deactivate -> dock -> BERTH[i+1]
+				| when (i == 1) shield_deactivate -> undock -> BERTH[i-1]
+				| when (i == i) shield_activate -> BERTH[i]).
+
+//TUGS(N=NUM_TUGS) = COUNT[N],
+//COUNT[i : 0..NUM_TUGS] = 
+//	(do -> COUNT[i+1]).
+
+//||MAIN = (PRODUCER || CONSUMER || OPERATOR || {p[PILOT]}:PILOT).
+||MAIN = (PRODUCER || CONSUMER || OPERATOR || PILOT || ARRIVAL_ZONE || DEPARTURE_ZONE || BERTH).
