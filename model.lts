@@ -6,6 +6,9 @@ const UNDOCKING_TUGS = 2
 const WAIT_ZONE_CAPACITY = 1
 range PILOTS = 1..NUM_PILOTS
 
+const DOCK = 0
+const UNDOCK = 1
+
 const FALSE = 0
 const TRUE = 1
 range BOOL = FALSE..TRUE
@@ -29,21 +32,25 @@ PILOT = (acquire_ship ->
 
 ARRIVAL_ZONE(N=WAIT_ZONE_CAPACITY) = COUNT[0],
 COUNT[i : 0..N] = 
-	( when (i < N) arrive -> COUNT[i+1]).
+	( when (i < N) arrive -> acquire_ship -> COUNT[i+1]
+	| when (i > 0) depart_arrival_zone -> COUNT[i-1]).
 
 DEPARTURE_ZONE(N=WAIT_ZONE_CAPACITY) = COUNT[0],
 COUNT[i : 0..N] = 
-	( when (i > 0) depart -> COUNT[i-1]).
+	( when (i < N) arrive_departure_zone -> COUNT[i+1]
+	| when (i > 0) release_ship -> depart -> COUNT[i-1]).
 
-BERTH(N=1) = BERTH[0][FALSE],
-BERTH[i:0..N][shield:BOOL] = ( when (i==0 && !shield) dock -> BERTH[1][shield]
-				| when (i==1 && !shield) undock -> BERTH[0][shield]
-				| when (!shield) shield_activate -> BERTH[i][TRUE]
-				| when (shield) shield_deactivate -> BERTH[i][FALSE]).
+BERTH(N=1) = BERTH[0][FALSE][FALSE],
+BERTH[current:0..N][shield:BOOL][occupied:BOOL] = ( when (current==DOCK && !shield && !occupied) dock -> BERTH[UNDOCK][shield][TRUE]
+				| when (current==UNDOCK && !shield) undock -> BERTH[DOCK][shield][FALSE]
+				| when (!shield) shield_activate -> BERTH[current][TRUE][occupied]
+				| when (shield) shield_deactivate -> BERTH[current][FALSE][occupied]).
 
-//TUGS(N=NUM_TUGS) = COUNT[N],
-//COUNT[i : 0..NUM_TUGS] = 
-//	(do -> COUNT[i+1]).
+TUGS(N=NUM_TUGS) = COUNT[N],
+COUNT[i : 0..NUM_TUGS] = 
+	( when(i >= DOCKING_TUGS) acquire_dock_tugs -> COUNT[i-DOCKING_TUGS]
+	| when(i <= (NUM_TUGS-DOCKING_TUGS)) release_dock_tugs -> COUNT[i+DOCKING_TUGS]
+	| when(i >= UNDOCKING_TUGS) acquire_undock_tugs -> COUNT[i-UNDOCKING_TUGS]
+	| when(i <= (NUM_TUGS-UNDOCKING_TUGS)) release_undock_tugs -> COUNT[i+UNDOCKING_TUGS]).
 
-//||MAIN = (PRODUCER || CONSUMER || OPERATOR || {p[PILOT]}:PILOT).
-||MAIN = (PRODUCER || CONSUMER || OPERATOR || PILOT || ARRIVAL_ZONE || DEPARTURE_ZONE || BERTH).
+||MAIN = (PRODUCER || CONSUMER || OPERATOR || ARRIVAL_ZONE || DEPARTURE_ZONE || BERTH || TUGS || {p[PILOTS]}:PILOT).
