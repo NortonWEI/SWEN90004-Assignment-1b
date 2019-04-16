@@ -35,10 +35,11 @@ DEPARTURE_ZONE(N=WAIT_ZONE_CAPACITY) = COUNT[0],
 COUNT[i : 0..N] = 
 	( when (i > 0) depart -> COUNT[i-1]).
 
-BERTH(N=1) = BERTH[0],
-BERTH[i:0..N] = ( when (i == 0) shield_deactivate -> dock -> BERTH[i+1]
-				| when (i == 1) shield_deactivate -> undock -> BERTH[i-1]
-				| when (i == i) shield_activate -> BERTH[i]).
+BERTH(N=1) = BERTH[0][FALSE],
+BERTH[i:0..N][shield:BOOL] = ( when (i==0 && !shield) dock -> BERTH[1][shield]
+				| when (i==1 && !shield) undock -> BERTH[0][shield]
+				| when (!shield) shield_activate -> BERTH[i][TRUE]
+				| when (shield) shield_deactivate -> BERTH[i][FALSE]).
 
 //TUGS(N=NUM_TUGS) = COUNT[N],
 //COUNT[i : 0..NUM_TUGS] = 
