@@ -11,7 +11,7 @@ const NUM_PILOTS = 3
 range PILOTS = 1..NUM_PILOTS
 
 // number of total tugs
-const NUM_TUGS = 5
+const NUM_TUGS = 6
 
 // range of tug number available
 range TUGS = 0..NUM_TUGS
@@ -167,3 +167,29 @@ TUGS[tug_num: TUGS] =
  */
 ||MAIN = (PRODUCER || CONSUMER || OPERATOR || ARRIVAL_ZONE || DEPARTURE_ZONE 
 		|| BERTH || p[PILOTS]::TUGS || p[PILOTS]:PILOT).
+
+property SAFE_ACTUATOR_PILOT = (acquire_ship -> release_ship -> SAFE_ACTUATOR_PILOT).
+property SAFE_ACTUATOR_DOCK_TUGS = (acquire_dock_tugs -> release_dock_tugs -> SAFE_ACTUATOR_DOCK_TUGS).
+property SAFE_ACTUATOR_UNDOCK_TUGS = (acquire_undock_tugs -> release_undock_tugs -> SAFE_ACTUATOR_UNDOCK_TUGS).
+property SAFE_ACTUATOR_DOCK = (dock -> undock -> SAFE_ACTUATOR_DOCK).
+property SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS = (acquire_ship -> 
+		acquire_dock_tugs -> SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS).
+property SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS = (unload -> acquire_undock_tugs -> 
+		SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
+
+||CHECK_MAIN = (MAIN || p[PILOTS]:SAFE_ACTUATOR_DOCK || p[PILOTS]:SAFE_ACTUATOR_PILOT || p[PILOTS]:SAFE_ACTUATOR_DOCK_TUGS || p[PILOTS]:SAFE_ACTUATOR_UNDOCK_TUGS || p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS || p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
+
+progress CHECK_PILOT_LIVENESS[num:PILOTS] = 
+	{p[num].acquire_ship, 
+	p[num].acquire_dock_tugs, 
+	p[num].depart_arrival_zone, 
+	p[num].dock, 
+	p[num].release_dock_tugs, 
+	p[num].unload, 
+	p[num].acquire_undock_tugs, 
+	p[num].undock, 
+	p[num].arrive_departure_zone, 
+	p[num].release_undock_tugs, 
+	p[num].release_ship }
+
+progress CHECK_PRO_CON_LIVENESS = {arrive, depart}

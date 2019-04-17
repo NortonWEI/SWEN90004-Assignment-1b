@@ -170,3 +170,18 @@ TUGS[tug_num: TUGS] =
  */
 ||MAIN = (PRODUCER || CONSUMER || OPERATOR || ARRIVAL_ZONE || DEPARTURE_ZONE 
 		|| BERTH || p[PILOTS]::TUGS || p[PILOTS]:PILOT).
+
+progress STARVATION[num:PILOTS] = 
+	{p[num].acquire_ship, 
+	p[num].acquire_dock_tugs, 
+	p[num].depart_arrival_zone, 
+	p[num].dock, 
+	p[num].release_dock_tugs, 
+	p[num].unload, 
+	p[num].acquire_undock_tugs, 
+	p[num].undock, 
+	p[num].arrive_departure_zone, 
+	p[num].release_undock_tugs, 
+	p[num].release_ship }
+
+progress PRO_CON = {arrive, depart}
