@@ -1,5 +1,6 @@
 /**
-* This is an FSP model to simulate the actions in USS Emafor.
+* This is a modified FSP model to simulate the actions in USS Emafor,
+* avoiding potential deadlocks/livelocks occurring.
 * 
 * @author Wenzhou Wei (903836)
 */
@@ -11,7 +12,7 @@ const NUM_PILOTS = 3
 range PILOTS = 1..NUM_PILOTS
 
 // number of total tugs
-const NUM_TUGS = 5
+const NUM_TUGS = 6
 
 // range of tug number available
 range TUGS = 0..NUM_TUGS
@@ -143,7 +144,9 @@ BERTH[action_triggered: 0..N][shield: BOOL][occupied: BOOL] =
 TUGS(N=NUM_TUGS) = TUGS[N],
 TUGS[tug_num: TUGS] = 
 	// ensure there are enough tugs to be acquried
-	( when(tug_num >= DOCKING_TUGS) acquire_dock_tugs -> 
+	// MODIFICATION: ensure there are always 
+	// enough undocking tugs reserved for undocking action
+	( when(tug_num-UNDOCKING_TUGS >= DOCKING_TUGS) acquire_dock_tugs -> 
 	TUGS[tug_num-DOCKING_TUGS]
 	// just to avoid compile warning, the guard condition should never happen
 	| when(tug_num <= (NUM_TUGS-DOCKING_TUGS)) release_dock_tugs -> 
