@@ -1,0 +1,169 @@
+/**
+* This is an FSP model to simulate the actions in USS Emafor.
+* 
+* @author Wenzhou Wei (903836)
+*/
+
+// number of total pilots
+const NUM_PILOTS = 3
+
+// range of pilot number
+range PILOTS = 1..NUM_PILOTS
+
+// number of total tugs
+const NUM_TUGS = 5
+
+// range of tug number available
+range TUGS = 0..NUM_TUGS
+
+// number of docking tugs required
+const DOCKING_TUGS = 3
+
+// number of undocking tugs required
+const UNDOCKING_TUGS = 2
+
+// the maximum ships allowed in wait zones 
+// my Java implementation assumes it is always 1
+const WAIT_ZONE_CAPACITY = 1
+
+// dock action 
+const DOCK = 0
+
+// undock action 
+const UNDOCK = 1
+
+// false value
+const FALSE = 0
+
+// true value
+const TRUE = 1
+
+// self-defined boolean
+range BOOL = FALSE..TRUE
+
+/**
+ * Produces new cargo ships wanting to unload cargo at the space station.
+ */
+PRODUCER = (arrive -> PRODUCER).
+
+/**
+ * Consumes unloaded cargo ships from the departure zone.
+ */
+CONSUMER = (depart -> CONSUMER).
+
+/**
+* Control the time of shield activation and deactivation.
+*/
+OPERATOR = (shield_activate -> shield_deactivate -> OPERATOR).
+
+/**
+ * The pilot that executes the entire simulation 
+ * from acquiring ships until getting off ships.
+ * All the actions are consistent with my Java implementation.
+ */
+PILOT = (acquire_ship -> 
+		acquire_dock_tugs -> 
+		depart_arrival_zone -> 
+		dock -> 
+		release_dock_tugs -> 
+		unload -> 
+		acquire_undock_tugs -> 
+		undock -> 
+		arrive_departure_zone -> 
+		release_undock_tugs -> 
+		release_ship -> PILOT).
+
+/**
+ * @param ship_num: the current number of ships in arrival zone
+ * 					assumed to be maximum 1
+ *
+ * Arrival zone accepts new ships from Producer, 
+ * passes ships as pilots' acquirement 
+ * and releases ships for following steps. 
+ */
+ARRIVAL_ZONE(N=WAIT_ZONE_CAPACITY) = ARRIVAL_ZONE[0],
+ARRIVAL_ZONE[ship_num: 0..N] = 
+	// a ship can only be acquired by 1 pilot
+	( when (ship_num < N) arrive -> p[PILOTS].acquire_ship -> 
+	ARRIVAL_ZONE[ship_num+1] 
+	// only 1 ship can depart at a time
+	| when (ship_num > 0) p[PILOTS].depart_arrival_zone -> 
+	ARRIVAL_ZONE[ship_num-1]).
+
+/**
+ * @param ship_num: the current number of ships in departure zone
+ * 					assumed to be maximum 1
+ *
+ * Departure zone accepts ships that finishes unload, 
+ * lets pilots get off the ships and releases ships to Consumer.
+ */
+DEPARTURE_ZONE(N=WAIT_ZONE_CAPACITY) = DEPARTURE_ZONE[0],
+DEPARTURE_ZONE[ship_num: 0..N] = 
+	// only 1 ship can arrive at a time
+	( when (ship_num < N) p[PILOTS].arrive_departure_zone -> 
+	DEPARTURE_ZONE[ship_num+1]
+	// a pilot can only release 1 ship
+	| when (ship_num > 0) p[PILOTS].release_ship -> depart -> 
+	DEPARTURE_ZONE[ship_num-1]).
+
+/**
+ * @param action_triggered: distinguish the triggered action: DOCK/UNDOCK
+ * @param shield: a flag indicating whether 
+				  the shield of the berth is activated or not
+ * @param occupied: a flag indicating whether 
+					the berth is occupied by a ship already
+ *
+ * Dock and undock the cargo ships to and from the berth of USS Emafor.
+ * Unload the ships.
+ */
+BERTH(N=1) = BERTH[0][FALSE][FALSE],
+BERTH[action_triggered: 0..N][shield: BOOL][occupied: BOOL] = 
+	// dock and undock actions are mutual exclusive
+	( when (action_triggered == DOCK && !shield && !occupied) 
+	p[PILOTS].dock -> 
+	BERTH[UNDOCK][shield][TRUE]
+	// resume the action to be "dock" for the next iteration
+	| when (action_triggered == UNDOCK && !shield) 
+	p[PILOTS].undock -> 
+	BERTH[DOCK][shield][FALSE]
+	// shield activation/deactivation is shared by pilots
+	// i.e. we only have 1 shield equipped
+	| when (!shield) shield_activate -> 
+	BERTH[action_triggered][TRUE][occupied]
+	
+	| when (shield) shield_deactivate -> 
+	BERTH[action_triggered][FALSE][occupied]).
+
+/**
+ * @param tug_num: the current number of tugs available
+ * 
+ * Maintain the quantity of tugs that can be used for dock and undock.
+ * Allocate and Deallocate the tugs for each dock and undock process. 
+ */
+TUGS(N=NUM_TUGS) = TUGS[N],
+TUGS[tug_num: TUGS] = 
+	// ensure there are enough tugs to be acquried
+	( when(tug_num >= DOCKING_TUGS) acquire_dock_tugs -> 
+	TUGS[tug_num-DOCKING_TUGS]
+	// just to avoid compile warning, the guard condition should never happen
+	| when(tug_num <= (NUM_TUGS-DOCKING_TUGS)) release_dock_tugs -> 
+	TUGS[tug_num+DOCKING_TUGS]
+	// ensure there are enough tugs to be acquried
+	| when(tug_num >= UNDOCKING_TUGS) acquire_undock_tugs -> 
+	TUGS[tug_num-UNDOCKING_TUGS]
+	// just to avoid compile warning, the guard condition should never happen
+	| when(tug_num <= (NUM_TUGS-UNDOCKING_TUGS)) release_undock_tugs -> 
+	TUGS[tug_num+UNDOCKING_TUGS]).
+
+/**
+ * The top-level component of the space station docking simulator.
+ * The MAIN process composites all of the sub-processes to simulate USS Emafor.
+ *
+ * Note that we defined "NUM_PILOTS" pilots and 
+ * "TUGS" as a set to be accessed by 1 pilot at a time.
+ * However, we do not want to make all actions in 
+ * "ARRIVAL_ZONE", "DEPARTURE_ZONE" and "BERTH" to be mutual exclusive, 
+ * so we difined them individually above.
+ */
+||MAIN = (PRODUCER || CONSUMER || OPERATOR || ARRIVAL_ZONE || DEPARTURE_ZONE 
+		|| BERTH || p[PILOTS]::TUGS || p[PILOTS]:PILOT).
