@@ -241,8 +241,9 @@ property NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS = (p[pilot:PILOTS].acquire_undock_t
  * Check whether there is no interference when docking at berth
  * by checking 2 pilots docking at berth consecutively.
  */
-property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock -> 
-	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> ERROR)).
+property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock -> p[pilot].undock -> 
+	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> p[pilot+1].undock -> INTERFERENCE_DOCK
+	|when(pilot-1>=1) p[pilot-1].dock -> p[pilot-1].undock -> INTERFERENCE_DOCK )).
 
 /** 
  * Composite as CHECK_MAIN.

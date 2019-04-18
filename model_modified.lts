@@ -1,6 +1,10 @@
 /**
-* This is an FSP model to simulate the actions in USS Emafor.
+* This is a modified FSP model to simulate the actions in USS Emafor,
+* avoiding potential deadlocks/livelocks occurring.
 * 
+* Modification: ensure there are always 
+* enough undocking tugs reserved for undocking action
+*
 * @author Wenzhou Wei (903836)
 */
 
@@ -241,7 +245,7 @@ property NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS = (p[pilot:PILOTS].acquire_undock_t
  * by checking 2 pilots docking at berth consecutively.
  */
 property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock -> 
-	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> ERROR)).
+	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> INTERFERENCE_DOCK)).
 
 /** 
  * Composite as CHECK_MAIN.

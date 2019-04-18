@@ -1,0 +1,37 @@
+# Author: Wenzhou Wei (903836)
+
+The project adopts Finite State Process (FSP) to reverse the Java implementation from assignment 1a under Labelled Transition System (LTS). The model established aims to abstract the basic behaviors of my original implementation, while maintain the constraints at the same time. Furthermore, some safety and liveness checks are expected to be examined to identify whether there is any potential issue related to the system. Based on the problems found, a modified model should be amended to tackle them accordingly.
+
+The problem identified in my model is a deadlock when there are not enough undocking tugs available for a ship in the berth to undock, resulting in all the other ships waiting for docking process. Mathematically, say the numbers of total pilots, total tugs, docking tugs and undocking tugs are P, N, D, U, respectively. Let R = N mod D. If R < U && P >= floor(N/D)+1, then the deadlock is fairly possible to happen. Specifically, R represents the rest of the tugs in the circumstances where all the other tugs are acquired by the ships waiting for docking. If R is not enough for undocking and P is equal to or larger than the number of ships which have acquired all docking tugs plus the ship in the berth, the deadlock is generated. However, this deadlock is not triggered if there are always enough tugs for undocking. Specifically, here is a possible trace to trigger the deadlock (printed in LTSA):
+
+Trace to terminal set of states:
+arrive
+p.1.acquire_ship
+p.1.acquire_dock_tugs
+p.1.depart_arrival_zone
+arrive
+p.3.acquire_ship
+available_tugs.3
+p.3.acquire_dock_tugs
+p.3.depart_arrival_zone
+arrive
+p.2.acquire_ship
+p.3.dock
+available_tugs.0
+p.3.release_dock_tugs
+available_tugs.3
+p.2.acquire_dock_tugs
+p.2.depart_arrival_zone
+arrive
+available_tugs.0
+p.3.unload
+
+In this case, there are not enough tugs for p3 to undock.
+
+As I established the model exactly based on my original Java implementation, this problem also appeared in my original one. In fact, I found this deadlock in my assignment 1a. However, the trigger condition was not clear without safety and liveness check in LTSA, which is accidentally found when I adjusted the parameters during assignment 1a. With LTSA tool, we have more confident and more possibility to discover any safety and liveness issues in the system.
+
+The main idea of my modified model is to always keep enough tugs for undocking even if there is some ship trying to acquire them for docking. In other words, the solution breaks the “wait-for cycle” rule of Coffman conditions by always reserving tugs for undocking.
+
+The trade-off of the solution is fairly obvious. Since we always keep enough tugs for undocking, the tugs of the system cannot be taken full advantage of. When the pilot of a new ship acquires docking tugs, the request will be rejected even if there are actually enough tugs for it to docking. The reserved tugs are “starved”.
+
+The project serves as an excellent opportunity for me to model and observe potential issues in a concurrent system using FSP.
