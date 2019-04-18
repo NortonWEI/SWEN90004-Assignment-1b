@@ -221,33 +221,6 @@ property SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS = (unload ->
 	acquire_undock_tugs -> SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
 
 /** 
- * Check whether there is no interference when acquiring docking tugs 
- * by caluculating the number of tugs after a pilot's acquirements.
- */
-property NO_INTERFERENCE_ACQUIRE_DOCK_TUGS = (p[pilot:PILOTS].acquire_dock_tugs -> 
-	available_tugs[tug:TUGS] -> 
-	(when(pilot+1<=NUM_PILOTS && tug-DOCKING_TUGS>=0) p[pilot+1].acquire_dock_tugs -> 
-	available_tugs[tug-DOCKING_TUGS] -> 
-	ERROR)).
-
-/** 
- * Check whether there is no interference when acquiring undocking tugs
- * by caluculating the number of tugs after a pilot's acquirements.
- */
-property NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS = (p[pilot:PILOTS].acquire_undock_tugs -> 
-	available_tugs[tug:TUGS] -> 
-	(when(pilot+1<=NUM_PILOTS && tug-UNDOCKING_TUGS>=0) p[pilot+1].acquire_undock_tugs -> 
-	available_tugs[tug-UNDOCKING_TUGS] -> 
-	ERROR)).
-
-/** 
- * Check whether there is no interference when docking at berth
- * by checking 2 pilots docking at berth consecutively.
- */
-property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock -> 
-	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> INTERFERENCE_DOCK)).
-
-/** 
  * Composite as CHECK_MAIN.
  */
 ||CHECK_MAIN = 
@@ -258,9 +231,6 @@ property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock ->
 	|| p[PILOTS]:SAFE_ACTUATOR_UNDOCK_TUGS 
 	|| p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS 
 	|| p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
-//	|| NO_INTERFERENCE_ACQUIRE_DOCK_TUGS
-//	|| NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS
-//	|| INTERFERENCE_DOCK).
 
 /** 
  * Check whether all the actions of all pilots can be eventually executed.
