@@ -1,6 +1,5 @@
 /**
-* This is a modified FSP model to simulate the actions in USS Emafor,
-* avoiding potential deadlocks/livelocks occurring.
+* This is an FSP model to simulate the actions in USS Emafor.
 * 
 * @author Wenzhou Wei (903836)
 */
@@ -140,38 +139,129 @@ BERTH[action_triggered: 0..N][shield: BOOL][occupied: BOOL] =
  * 
  * Maintain the quantity of tugs that can be used for dock and undock.
  * Allocate and Deallocate the tugs for each dock and undock process. 
+ *
+ * Note that "available_tugs[num: TUGS]" indicates the number of tugs left.
  */
 TUGS(N=NUM_TUGS) = TUGS[N],
 TUGS[tug_num: TUGS] = 
 	// ensure there are enough tugs to be acquried
 	// MODIFICATION: ensure there are always 
 	// enough undocking tugs reserved for undocking action
-	( when(tug_num-UNDOCKING_TUGS >= DOCKING_TUGS) acquire_dock_tugs -> 
-	TUGS[tug_num-DOCKING_TUGS]
+	( when(tug_num-UNDOCKING_TUGS >= DOCKING_TUGS) 
+	p[PILOTS].acquire_dock_tugs -> 
+	available_tugs[tug_num-DOCKING_TUGS] -> TUGS[tug_num-DOCKING_TUGS]
 	// just to avoid compile warning, the guard condition should never happen
-	| when(tug_num <= (NUM_TUGS-DOCKING_TUGS)) release_dock_tugs -> 
-	TUGS[tug_num+DOCKING_TUGS]
+	| when(tug_num <= (NUM_TUGS-DOCKING_TUGS)) p[PILOTS].release_dock_tugs -> 
+	available_tugs[tug_num+DOCKING_TUGS] -> TUGS[tug_num+DOCKING_TUGS]
 	// ensure there are enough tugs to be acquried
-	| when(tug_num >= UNDOCKING_TUGS) acquire_undock_tugs -> 
-	TUGS[tug_num-UNDOCKING_TUGS]
+	| when(tug_num >= UNDOCKING_TUGS) p[PILOTS].acquire_undock_tugs -> 
+	available_tugs[tug_num-UNDOCKING_TUGS] -> TUGS[tug_num-UNDOCKING_TUGS]
 	// just to avoid compile warning, the guard condition should never happen
-	| when(tug_num <= (NUM_TUGS-UNDOCKING_TUGS)) release_undock_tugs -> 
-	TUGS[tug_num+UNDOCKING_TUGS]).
+	| when(tug_num <= (NUM_TUGS-UNDOCKING_TUGS)) p[PILOTS].release_undock_tugs -> 
+	available_tugs[tug_num+UNDOCKING_TUGS] -> TUGS[tug_num+UNDOCKING_TUGS]).
 
 /**
  * The top-level component of the space station docking simulator.
  * The MAIN process composites all of the sub-processes to simulate USS Emafor.
  *
- * Note that we defined "NUM_PILOTS" pilots and 
- * "TUGS" as a set to be accessed by 1 pilot at a time.
- * However, we do not want to make all actions in 
+ * Note that we defined "NUM_PILOTS" pilots.
+ * However, we do not want to make all actions in "TUGS", 
  * "ARRIVAL_ZONE", "DEPARTURE_ZONE" and "BERTH" to be mutual exclusive, 
  * so we difined them individually above.
  */
-||MAIN = (PRODUCER || CONSUMER || OPERATOR || ARRIVAL_ZONE || DEPARTURE_ZONE 
-		|| BERTH || p[PILOTS]::TUGS || p[PILOTS]:PILOT).
+||MAIN = 
+	(PRODUCER 
+	|| CONSUMER 
+	|| OPERATOR 
+	|| ARRIVAL_ZONE 
+	|| DEPARTURE_ZONE 
+	|| BERTH 
+	|| TUGS 
+	|| p[PILOTS]:PILOT).
 
-progress STARVATION[num:PILOTS] = 
+// ---------Check Safety and Liveness Properties----------
+
+/** 
+ * Check whether a pilot acquires a ship before releases it.
+ */
+property SAFE_ACTUATOR_PILOT = (acquire_ship -> 
+	release_ship -> SAFE_ACTUATOR_PILOT).
+
+/** 
+ * Check whether a pilot acquires docking tugs before releases them.
+ */
+property SAFE_ACTUATOR_DOCK_TUGS = (acquire_dock_tugs -> 
+	release_dock_tugs -> SAFE_ACTUATOR_DOCK_TUGS).
+
+/** 
+ * Check whether a pilot acquires undocking tugs before releases them.
+ */
+property SAFE_ACTUATOR_UNDOCK_TUGS = (acquire_undock_tugs -> 
+	release_undock_tugs -> SAFE_ACTUATOR_UNDOCK_TUGS).
+
+/** 
+ * Check whether a pilot docks to a berth before undocks from it.
+ */
+property SAFE_ACTUATOR_DOCK = (dock -> undock -> SAFE_ACTUATOR_DOCK).
+
+/** 
+ * Check whether a pilot acquires a ship before acquires docking tugs.
+ */
+property SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS = (acquire_ship -> 
+	acquire_dock_tugs -> SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS).
+
+/** 
+ * Check whether a pilot undocks from a berth before acquires undocking tugs.
+ */
+property SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS = (unload -> 
+	acquire_undock_tugs -> SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
+
+/** 
+ * Check whether there is no interference when acquiring docking tugs 
+ * by caluculating the number of tugs after a pilot's acquirements.
+ */
+property NO_INTERFERENCE_ACQUIRE_DOCK_TUGS = (p[pilot:PILOTS].acquire_dock_tugs -> 
+	available_tugs[tug:TUGS] -> 
+	(when(pilot+1<=NUM_PILOTS && tug-DOCKING_TUGS>=0) p[pilot+1].acquire_dock_tugs -> 
+	available_tugs[tug-DOCKING_TUGS] -> 
+	ERROR)).
+
+/** 
+ * Check whether there is no interference when acquiring undocking tugs
+ * by caluculating the number of tugs after a pilot's acquirements.
+ */
+property NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS = (p[pilot:PILOTS].acquire_undock_tugs -> 
+	available_tugs[tug:TUGS] -> 
+	(when(pilot+1<=NUM_PILOTS && tug-UNDOCKING_TUGS>=0) p[pilot+1].acquire_undock_tugs -> 
+	available_tugs[tug-UNDOCKING_TUGS] -> 
+	ERROR)).
+
+/** 
+ * Check whether there is no interference when docking at berth
+ * by checking 2 pilots docking at berth consecutively.
+ */
+property INTERFERENCE_DOCK = (p[pilot:PILOTS].dock -> 
+	(when(pilot+1<=NUM_PILOTS) p[pilot+1].dock -> ERROR)).
+
+/** 
+ * Composite as CHECK_MAIN.
+ */
+||CHECK_MAIN = 
+	(MAIN 
+	|| p[PILOTS]:SAFE_ACTUATOR_DOCK 
+	|| p[PILOTS]:SAFE_ACTUATOR_PILOT 
+	|| p[PILOTS]:SAFE_ACTUATOR_DOCK_TUGS 
+	|| p[PILOTS]:SAFE_ACTUATOR_UNDOCK_TUGS 
+	|| p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_DOCK_TUGS 
+	|| p[PILOTS]:SAFE_ACTUATOR_ACQUIRE_UNDOCK_TUGS).
+//	|| NO_INTERFERENCE_ACQUIRE_DOCK_TUGS
+//	|| NO_INTERFERENCE_ACQUIRE_UNDOCK_TUGS
+//	|| INTERFERENCE_DOCK).
+
+/** 
+ * Check whether all the actions of all pilots can be eventually executed.
+ */
+progress CHECK_PILOT_LIVENESS[num:PILOTS] = 
 	{p[num].acquire_ship, 
 	p[num].acquire_dock_tugs, 
 	p[num].depart_arrival_zone, 
@@ -184,4 +274,8 @@ progress STARVATION[num:PILOTS] =
 	p[num].release_undock_tugs, 
 	p[num].release_ship }
 
-progress PRO_CON = {arrive, depart}
+/** 
+ * Check whether a ship can arrive at arrival zone 
+ * and eventually depart from departure zone.
+ */
+progress CHECK_PRO_CON_LIVENESS = {arrive, depart} 
